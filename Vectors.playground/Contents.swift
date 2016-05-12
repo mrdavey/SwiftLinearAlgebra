@@ -8,6 +8,10 @@ enum AngleType {
 
 let significantDigits: Double = 1000 // i.e. 1000 = 0.000
 
+//
+//  Vectors
+//
+
 struct Vector: Equatable {
     var coordinate: [Double] = []
     var count: Int {
@@ -130,7 +134,7 @@ struct Vector: Equatable {
         let multipleCoordinate: [Double] = vectorOne.coordinate.map() {
             let index = vectorOne.coordinate.indexOf($0)!
             let valueToCompare = vectorTwo.coordinate[index]
-            return $0 / valueToCompare
+            return round(($0 / valueToCompare) * significantDigits) / significantDigits
         }
 
         let average = multipleCoordinate.reduce(0, combine: +) / Double(multipleCoordinate.count)
@@ -388,3 +392,146 @@ func *(lhs: Vector, rhs: Double) -> Vector {
 //let crossVectorSix = Vector(coordinates: -6.007, 0.124, 5.772)
 //let crossProductTwo = Vector.crossProduct(crossVectorFive, vectorTwo: crossVectorSix)!
 //Vector.areaOfTriangle(crossProductTwo)
+
+
+
+//
+//  Lines
+//
+
+struct Line {
+    var normalVector = Vector(coordinates: 0,0)
+    var constantTerm = 0.0
+    var basePoint: Vector?
+
+    init(normalVector: Vector?, constantTerm: Double?) {
+        if normalVector != nil {
+            self.normalVector = normalVector!
+        }
+
+        if constantTerm != nil {
+            self.constantTerm = constantTerm!
+        }
+
+        setBasePoint()
+    }
+
+    mutating func setBasePoint() {
+        var basePointCoords = [0.0, 0.0]
+        if let initialIndex = Line.findFirstNonZeroIndex(normalVector) {
+            let initialCoefficient = normalVector.coordinate[initialIndex]
+            basePointCoords[initialIndex] = constantTerm/initialCoefficient
+            self.basePoint = Vector(coordinates: basePointCoords)
+        }
+    }
+
+    func createStandardForm() -> String {
+
+        if let initialIndex = Line.findFirstNonZeroIndex(normalVector) {
+            let coordinates = normalVector.coordinate
+            let terms: [String] = coordinates.map {
+                let isInitialElement = coordinates.indexOf($0) == initialIndex
+                var output = ""
+                let roundedCoefficent = round($0 * significantDigits) / significantDigits
+                if roundedCoefficent < 0 {
+                    output += "-"
+                } else if roundedCoefficent > 0 && !isInitialElement {
+                    output += "+"
+                }
+
+                if abs(roundedCoefficent) != 0 {
+                    output += "\(abs(roundedCoefficent))"
+                }
+
+                return output
+            }
+
+            var standardForm = terms.joinWithSeparator(" ")
+            let roundedConstant = round(constantTerm * significantDigits) / significantDigits
+            standardForm += " = \(roundedConstant)"
+            return standardForm
+        }
+
+        print("Couldn't createStandardForm")
+        return ""
+    }
+
+    static func findFirstNonZeroIndex(normalVector: Vector) -> Int? {
+        let firstElement = normalVector.coordinate.filter {
+                let rounded = round($0 * significantDigits) / significantDigits
+                return rounded != 0
+            }.first
+        return normalVector.coordinate.indexOf(firstElement!)
+    }
+
+    static func areLinesParallel(lineOne: Line, lineTwo: Line) -> Bool {
+        //  Two lines in 2D are parallel if their normal vectors are parallel vectors
+        let parallel = Vector.areVectorsParallel(lineOne.normalVector, vectorTwo: lineTwo.normalVector)
+        return parallel.isParallel
+    }
+
+    static func areParallelLinesEqual(lineOne: Line, lineTwo: Line) -> Bool? {
+        guard areLinesParallel(lineOne, lineTwo: lineTwo) else {
+            print("Lines are not parallel!")
+            return nil
+        }
+
+        //  Two parallel lines are equal if the vector connecting one point on each line is orthogonal to the lines' normal vectors
+
+        //  The vector connecting a point on each line
+        let differenceVector = lineOne.basePoint! - lineTwo.basePoint!
+
+        //  Only need to calculate orthogonality for one line, since we know they are both parallel
+        return Vector.areVectorsOrthogonal(lineOne.normalVector, vectorTwo: differenceVector!)
+    }
+
+    static func findIntersectionOfNonParallelLines(lineOne: Line, lineTwo: Line) -> (x: Double, y: Double)? {
+        guard !areLinesParallel(lineOne, lineTwo: lineTwo) else {
+            print("Lines are parallel!. Only non-parallel lines have an intersection!")
+            return nil
+        }
+
+        //  Ax + By = k1
+        //  Cx + Dy = k2
+
+        //  x = (Dk1 - Bk2) / (AD - BC)
+        //  y = (-Ck1 + Ak2) / (AD - BC)
+
+        let lineOneStandardForm = lineOne.createStandardForm().componentsSeparatedByString(" ")
+        let A = Double(lineOneStandardForm[0])!
+        let B = Double(lineOneStandardForm[1])!
+        let K1 = Double(lineOneStandardForm[3])!
+
+        let lineTwoStandardForm = lineTwo.createStandardForm().componentsSeparatedByString(" ")
+        let C = Double(lineTwoStandardForm[0])!
+        let D = Double(lineTwoStandardForm[1])!
+        let K2 = Double(lineTwoStandardForm[3])!
+
+        let x = ((D * K1) - (B * K2)) / ((A * D) - (B * C))
+        let y = ((-C * K1) + (A * K2)) / ((A * D) - (B * C))
+
+        return (x: x, y: y)
+    }
+}
+
+//let line1 = Line(normalVector: Vector(coordinates: 4.046, 2.836), constantTerm: 1.21)
+//let line2 = Line(normalVector: Vector(coordinates: 10.115, 7.09), constantTerm: 3.025)
+//
+//Line.areLinesParallel(line1, lineTwo: line2)
+//Line.areParallelLinesEqual(line1, lineTwo: line2)
+//Line.findIntersectionOfNonParallelLines(line1, lineTwo: line2)
+//
+//let line3 = Line(normalVector: Vector(coordinates: 7.204, 3.182), constantTerm: 8.68)
+//let line4 = Line(normalVector: Vector(coordinates: 8.172, 4.114), constantTerm: 9.883)
+//
+//Line.areLinesParallel(line3, lineTwo: line4)
+//Line.areParallelLinesEqual(line3, lineTwo: line4)
+//Line.findIntersectionOfNonParallelLines(line3, lineTwo: line4)
+
+//let line5 = Line(normalVector: Vector(coordinates: 1.182, 5.562), constantTerm: 6.744)
+//let line6 = Line(normalVector: Vector(coordinates: 1.773, 8.343), constantTerm: 9.525)
+//
+//Line.areLinesParallel(line5, lineTwo: line6)
+//Line.areParallelLinesEqual(line5, lineTwo: line6)
+//Line.findIntersectionOfNonParallelLines(line5, lineTwo: line6)
+
