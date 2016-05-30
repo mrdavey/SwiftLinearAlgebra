@@ -8,11 +8,7 @@ enum AngleType {
 
 let significantDigits: Double = 1000 // i.e. 1000 = 0.000
 
-//
-//  Vectors
-//
-
-struct Vector: Equatable {
+struct Vector: Equatable, CustomStringConvertible {
     var coordinate: [Double] = []
     var count: Int {
         get {
@@ -30,19 +26,17 @@ struct Vector: Equatable {
         self.coordinate = coordinates
     }
 
-    init() {
-        print("no coordinates given")
-    }
-
-    func printCoord() {
-        print("Vector: \(coordinate)")
+    var description: String {
+        return "Vector: \(coordinate)"
     }
 
     static func sameNumberOfElements(vectorOne: Vector, vectorTwo: Vector) -> Bool {
+
         let sameNumber = vectorOne.count == vectorTwo.count
         if sameNumber == false {
             print("Different number of elements in coordinates")
         }
+
         return sameNumber
     }
 
@@ -54,28 +48,33 @@ struct Vector: Equatable {
             var convertedVector = vector.coordinate
             convertedVector.append(0)
             return Vector(coordinates: convertedVector)
-        }
-        else if vector.count == 3 {
+
+        } else if vector.count == 3 {
 
             return vector
-        }
-        else {
-            print("Cross product must only have 2 or 3 dimensions")
+
+        } else {
+
+            print("Cross product between Vectors must only have 2 or 3 dimensions")
             return nil
+
         }
     }
 
     //  Magnitude of Vector
 
     static func magnitude(vector: Vector) -> Double {
+
         let sumOfSquares = vector.coordinate.map() { $0 * $0 } //  Squares
             .reduce(0) { $0 + $1 } //   Sum
+
         return sqrt(sumOfSquares)
     }
 
     //  Direction of Vector (i.e. Normalization)
 
     static func direction(vector: Vector) -> Vector? {
+
         guard vector.coordinate.reduce(0, combine: +) != 0 else {
             print("Cannot normalise a zero vector")
             return nil
@@ -396,60 +395,54 @@ func *(lhs: Vector, rhs: Double) -> Vector {
 //let crossProductTwo = Vector.crossProduct(crossVectorFive, vectorTwo: crossVectorSix)!
 //Vector.areaOfTriangle(crossProductTwo)
 
-enum Type {
-    enum Line: Int {
-        case dimensions = 2
+class MultiDimensionVector: CustomStringConvertible {
+    private var constantTerm = 0.0
+    private var basePoint = Vector()
+    private var basePointCoords: [Double]
+    private var normalVector: Vector
+    private var dimensions: Int
+
+    var description: String {
+        return "\(dimensions)D Vector"
     }
-    enum Plane: Int {
-        case dimensions = 3
-    }
-}
 
+    init(normalVector: Vector, constantTerm: Double?) {
 
-//
-//  Lines
-//
+        self.normalVector = normalVector
 
-class Line {
-    //  Line in 2D
-    static let dimensions = 2
-
-    static var basePointCoords: [Double] = {
+        dimensions = self.normalVector.count
         var coords: [Double] = []
-        for dimension in 1...dimensions {
+        for _ in 1...dimensions {
             coords.append(0)
         }
+        basePointCoords = coords
 
-        return coords
-    }()
+        self.constantTerm = constantTerm ?? 0
 
-    var normalVector = Vector(coordinates: basePointCoords)
-    var constantTerm = 0.0
-    var basePoint: Vector?
-
-    init(normalVector: Vector?, constantTerm: Double?) {
-        if normalVector != nil {
-            self.normalVector = normalVector!
-        }
-
-        if constantTerm != nil {
-            self.constantTerm = constantTerm!
-        }
-
-        setBasePoint()
+        setBasePointCoords()
     }
 
-    func setBasePoint() {
-        if let initialIndex = Line.findFirstNonZeroIndex(normalVector) {
+    private func setBasePointCoords() {
+        if let initialIndex = self.findFirstNonZeroIndex(normalVector) {
+
             let initialCoefficient = normalVector.coordinate[initialIndex]
-            Line.basePointCoords[initialIndex] = constantTerm/initialCoefficient
-            self.basePoint = Vector(coordinates: Line.basePointCoords)
+            self.basePointCoords[initialIndex] = constantTerm/initialCoefficient
+            self.basePoint = Vector(coordinates: self.basePointCoords)
         }
+    }
+
+    private func findFirstNonZeroIndex(normalVector: Vector) -> Int? {
+
+        let firstElement = normalVector.coordinate.filter {
+            let rounded = round($0 * significantDigits) / significantDigits
+            return rounded != 0
+            }.first
+        return normalVector.coordinate.indexOf(firstElement!)
     }
 
     func createStandardForm() -> String {
 
-        if let initialIndex = Line.findFirstNonZeroIndex(normalVector) {
+        if let initialIndex = self.findFirstNonZeroIndex(normalVector) {
             let coordinates = normalVector.coordinate
             let terms: [String] = coordinates.map {
                 let isInitialElement = coordinates.indexOf($0) == initialIndex
@@ -478,38 +471,26 @@ class Line {
         return ""
     }
 
-    static func findFirstNonZeroIndex(normalVector: Vector) -> Int? {
-        let firstElement = normalVector.coordinate.filter {
-                let rounded = round($0 * significantDigits) / significantDigits
-                return rounded != 0
-            }.first
-        return normalVector.coordinate.indexOf(firstElement!)
-    }
+    func isParallelTo(mdVector: MultiDimensionVector) -> (isParallel: Bool, isEqual: Bool) {
 
-    static func areLinesParallel(lineOne: Line, lineTwo: Line) -> Bool {
         //  Two lines in 2D are parallel if their normal vectors are parallel vectors
-        let parallel = Vector.areVectorsParallel(lineOne.normalVector, vectorTwo: lineTwo.normalVector)
-        return parallel.isParallel
-    }
+        let parallel = Vector.areVectorsParallel(self.normalVector, vectorTwo: mdVector.normalVector)
 
-    static func areParallelLinesEqual(lineOne: Line, lineTwo: Line) -> Bool? {
-        guard areLinesParallel(lineOne, lineTwo: lineTwo) else {
-            print("Lines are not parallel!")
-            return nil
+        if parallel.isParallel {
+            //  Two parallel lines are equal if the vector connecting one point on each line is orthogonal to the lines' normal vectors
+
+            //  The vector connecting a point on each line
+            let differenceVector = self.basePoint - mdVector.basePoint
+
+            //  Only need to calculate orthogonality for one line, since we know they are both parallel
+            return (isParallel: true, isEqual: Vector.areVectorsOrthogonal(self.normalVector, vectorTwo: differenceVector!) ?? false)
         }
 
-        //  Two parallel lines are equal if the vector connecting one point on each line is orthogonal to the lines' normal vectors
-
-        //  The vector connecting a point on each line
-        let differenceVector = lineOne.basePoint! - lineTwo.basePoint!
-
-        //  Only need to calculate orthogonality for one line, since we know they are both parallel
-        return Vector.areVectorsOrthogonal(lineOne.normalVector, vectorTwo: differenceVector!)
+        return (isParallel: false, isEqual: false)
     }
 
-    static func findIntersectionOfNonParallelLines(lineOne: Line, lineTwo: Line) -> (x: Double, y: Double)? {
-        guard !areLinesParallel(lineOne, lineTwo: lineTwo) else {
-            print("Lines are parallel!. Only non-parallel lines have an intersection!")
+    func isIntersectedWith(mdVector: MultiDimensionVector) -> (x: Double, y: Double)? {
+        guard isParallelTo(mdVector).isParallel == false else {
             return nil
         }
 
@@ -519,152 +500,121 @@ class Line {
         //  x = (Dk1 - Bk2) / (AD - BC)
         //  y = (-Ck1 + Ak2) / (AD - BC)
 
-        let lineOneStandardForm = lineOne.createStandardForm().componentsSeparatedByString(" ")
+        let lineOneStandardForm = self.createStandardForm().componentsSeparatedByString(" ")
         let A = Double(lineOneStandardForm[0])!
         let B = Double(lineOneStandardForm[1])!
         let K1 = Double(lineOneStandardForm[3])!
 
-        let lineTwoStandardForm = lineTwo.createStandardForm().componentsSeparatedByString(" ")
+        let lineTwoStandardForm = mdVector.createStandardForm().componentsSeparatedByString(" ")
         let C = Double(lineTwoStandardForm[0])!
         let D = Double(lineTwoStandardForm[1])!
         let K2 = Double(lineTwoStandardForm[3])!
 
         let x = ((D * K1) - (B * K2)) / ((A * D) - (B * C))
         let y = ((-C * K1) + (A * K2)) / ((A * D) - (B * C))
-
+        
         return (x: x, y: y)
     }
 }
 
+class Line: MultiDimensionVector {
+    init(x: Double, y: Double, constant: Double) {
+        super.init(normalVector: Vector(coordinates: x, y), constantTerm: constant)
+    }
 
-//let line1 = Line(normalVector: Vector(coordinates: 4.046, 2.836), constantTerm: 1.21)
-//let line2 = Line(normalVector: Vector(coordinates: 10.115, 7.09), constantTerm: 3.025)
-//
-//Line.areLinesParallel(line1, lineTwo: line2)
-//Line.areParallelLinesEqual(line1, lineTwo: line2)
-//Line.findIntersectionOfNonParallelLines(line1, lineTwo: line2)
-//
-//let line3 = Line(normalVector: Vector(coordinates: 7.204, 3.182), constantTerm: 8.68)
-//let line4 = Line(normalVector: Vector(coordinates: 8.172, 4.114), constantTerm: 9.883)
-//
-//Line.areLinesParallel(line3, lineTwo: line4)
-//Line.areParallelLinesEqual(line3, lineTwo: line4)
-//Line.findIntersectionOfNonParallelLines(line3, lineTwo: line4)
+    static func describe(lineOne: Line, _ lineTwo: Line) -> String {
+        let isParallel = lineOne.isParallelTo(lineTwo)
 
-//let line5 = Line(normalVector: Vector(coordinates: 1.182, 5.562), constantTerm: 6.744)
-//let line6 = Line(normalVector: Vector(coordinates: 1.773, 8.343), constantTerm: 9.525)
-//
-//Line.areLinesParallel(line5, lineTwo: line6)
-//Line.areParallelLinesEqual(line5, lineTwo: line6)
-//Line.findIntersectionOfNonParallelLines(line5, lineTwo: line6)
+        if isParallel.isParallel && isParallel.isEqual {
+            return "Lines are the same line (equal and parallel)"
+        }
 
+        if isParallel.isParallel && isParallel.isEqual == false {
+            return "Lines are parallel, but not equal (no intersection)"
+        }
+
+        if isParallel.isParallel == false {
+            var string = ""
+            if isParallel.isEqual {
+                string = "Lines are equal and "
+            }
+
+            if let isIntersected = lineOne.isIntersectedWith(lineTwo) {
+                string += "Lines intersect at (\(round(isIntersected.x * significantDigits) / significantDigits), \(round(isIntersected.y * significantDigits) / significantDigits))"
+            }
+
+            return string
+        }
+
+        return ""
+    }
+}
+
+class Plane: MultiDimensionVector {
+    init(x: Double, y: Double, z: Double, constant: Double) {
+        super.init(normalVector: Vector(coordinates: x, y, z), constantTerm: constant)
+    }
+
+    static func describe(planeOne: Plane, _ planeTwo: Plane) -> String {
+        let isParallel = planeOne.isParallelTo(planeTwo)
+
+        if isParallel.isParallel && isParallel.isEqual {
+            return "Planes are the same plane (equal and parallel)"
+        }
+
+        if isParallel.isParallel && isParallel.isEqual == false {
+            return "Planes are parallel, but not equal (no intersection)"
+        }
+
+        if isParallel.isParallel == false {
+            var string = "Planes are not parallel"
+            if isParallel.isEqual {
+                string = "Planes are equal and "
+            } else {
+                string += " and are not equal"
+            }
+
+            //  TODO: Plane intersection
+
+            return string
+        }
+
+        return ""
+    }
+}
+
+
+//
+//  Lines
+//
+
+let line1 = Line(x: 4.046, y: 2.836, constant: 1.21)
+let line2 = Line(x: 10.115, y: 7.09, constant: 3.025)
+Line.describe(line1, line2)
+
+let line3 = Line(x: 7.204, y: 3.182, constant: 8.68)
+let line4 = Line(x: 8.172, y: 4.114, constant: 9.883)
+Line.describe(line3, line4)
+
+let line5 = Line(x: 1.182, y: 5.562, constant: 6.744)
+let line6 = Line(x: 1.773, y: 8.343, constant: 9.525)
+Line.describe(line5, line6)
 
 //
 //  Planes
 //
 
-struct Plane {
-    //  Plane in 3D
-    var normalVector = Vector(coordinates: 0,0,0)
-    var constantTerm = 0.0
-    var basePoint: Vector?
+let plane1 = Plane(x: -0.412, y: 3.806, z: 0.728, constant: -3.46)
+let plane2 = Plane(x: 1.03, y: -9.515, z: -1.82, constant: 8.65)
+Plane.describe(plane1, plane2)
 
-    init(normalVector: Vector?, constantTerm: Double?) {
-        if normalVector != nil {
-            self.normalVector = normalVector!
-        }
+let plane3 = Plane(x: 2.611, y: 5.528, z: 0.283, constant: 4.6)
+let plane4 = Plane(x: 7.715, y: 8.306, z: 8.306, constant: 3.76)
+Plane.describe(plane3, plane4)
 
-        if constantTerm != nil {
-            self.constantTerm = constantTerm!
-        }
-
-        setBasePoint()
-    }
-
-    mutating func setBasePoint() {
-
-        var basePointCoords = [0.0, 0.0, 0.0]
-        if let initialIndex = Plane.findFirstNonZeroIndex(normalVector) {
-            let initialCoefficient = normalVector.coordinate[initialIndex]
-            basePointCoords[initialIndex] = constantTerm/initialCoefficient
-            self.basePoint = Vector(coordinates: basePointCoords)
-        }
-    }
-
-    func createStandardForm() -> String {
-
-        if let initialIndex = Plane.findFirstNonZeroIndex(normalVector) {
-            let coordinates = normalVector.coordinate
-            let terms: [String] = coordinates.map {
-                let isInitialElement = coordinates.indexOf($0) == initialIndex
-                var output = ""
-                let roundedCoefficent = round($0 * significantDigits) / significantDigits
-                if roundedCoefficent < 0 {
-                    output += "-"
-                } else if roundedCoefficent > 0 && !isInitialElement {
-                    output += "+"
-                }
-
-                if abs(roundedCoefficent) != 0 {
-                    output += "\(abs(roundedCoefficent))"
-                }
-
-                return output
-            }
-
-            var standardForm = terms.joinWithSeparator(" ")
-            let roundedConstant = round(constantTerm * significantDigits) / significantDigits
-            standardForm += " = \(roundedConstant)"
-            return standardForm
-        }
-
-        print("Couldn't createStandardForm")
-        return ""
-    }
-
-    static func findFirstNonZeroIndex(normalVector: Vector) -> Int? {
-        let firstElement = normalVector.coordinate.filter {
-            let rounded = round($0 * significantDigits) / significantDigits
-            return rounded != 0
-            }.first
-        return normalVector.coordinate.indexOf(firstElement!)
-    }
-
-    static func arePlanesParallel(planeOne: Plane, planeTwo: Plane) -> Bool {
-        //  Two planes in 3D are parallel if their normal vectors are parallel vectors
-        let parallel = Vector.areVectorsParallel(planeOne.normalVector, vectorTwo: planeTwo.normalVector)
-        return parallel.isParallel
-    }
-
-    static func areParallelPlanesEqual(planeOne: Plane, planeTwo: Plane) -> Bool? {
-        guard arePlanesParallel(planeOne, planeTwo: planeTwo) else {
-            print("Planes are not parallel!")
-            return nil
-        }
-
-        //  Two parallel planes are equal if the vector connecting one point on each planes is orthogonal to the planes' normal vectors
-
-        //  The vector connecting a point on each plane
-        let differenceVector = planeOne.basePoint! - planeTwo.basePoint!
-
-        //  Only need to calculate orthogonality for one line, since we know they are both parallel
-        return Vector.areVectorsOrthogonal(planeOne.normalVector, vectorTwo: differenceVector!)
-    }
-}
-//
-//let planeOne = Plane(normalVector: Vector(coordinates: -0.412, 3.806, 0.728) , constantTerm: -3.46)
-//let planeTwo = Plane(normalVector: Vector(coordinates: 1.03, -9.515, -1.82) , constantTerm: 8.65)
-//Plane.areParallelPlanesEqual(planeOne, planeTwo: planeTwo)
-//
-//let planeThree = Plane(normalVector: Vector(coordinates: 2.611, 5.528, 0.283) , constantTerm: 4.6)
-//let planeFour = Plane(normalVector: Vector(coordinates: 7.715, 8.306, 5.342) , constantTerm: 3.76)
-//Plane.areParallelPlanesEqual(planeThree, planeTwo: planeFour)
-//
-//let planeFive = Plane(normalVector: Vector(coordinates: -7.926, 8.625, -7.217) , constantTerm: -7.952)
-//let planeSix = Plane(normalVector: Vector(coordinates: -2.642, 2.875, -2.404) , constantTerm: -2.443)
-//Plane.areParallelPlanesEqual(planeFive, planeTwo: planeSix)
-
-
+let plane5 = Plane(x: -7.926, y: 8.625, z: -7.217, constant: -7.952)
+let plane6 = Plane(x: -2.642, y: 2.875, z: -2.404, constant: -2.443)
+Plane.describe(plane5, plane6)
 
 
 
