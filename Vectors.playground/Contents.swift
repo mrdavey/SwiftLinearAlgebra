@@ -400,7 +400,7 @@ class MultiDimensionVector: CustomStringConvertible {
     private var basePoint = Vector()
     private var basePointCoords: [Double]
     private var normalVector: Vector
-    private var dimensions: Int
+    var dimensions: Int
 
     var description: String {
         return "\(dimensions)D Vector"
@@ -427,8 +427,8 @@ class MultiDimensionVector: CustomStringConvertible {
 
             let initialCoefficient = normalVector.coordinate[initialIndex]
             self.basePointCoords[initialIndex] = constantTerm/initialCoefficient
-            self.basePoint = Vector(coordinates: self.basePointCoords)
         }
+        self.basePoint = Vector(coordinates: self.basePointCoords)
     }
 
     private func findFirstNonZeroIndex(normalVector: Vector) -> Int? {
@@ -437,7 +437,8 @@ class MultiDimensionVector: CustomStringConvertible {
             let rounded = round($0 * significantDigits) / significantDigits
             return rounded != 0
             }.first
-        return normalVector.coordinate.indexOf(firstElement!)
+
+        return firstElement != nil ? normalVector.coordinate.indexOf(firstElement!) : nil
     }
 
     func createStandardForm() -> String {
@@ -514,6 +515,20 @@ class MultiDimensionVector: CustomStringConvertible {
         let y = ((-C * K1) + (A * K2)) / ((A * D) - (B * C))
         
         return (x: x, y: y)
+    }
+}
+
+//  Equatable
+
+func ==(lhs: MultiDimensionVector, rhs: MultiDimensionVector) -> Bool {
+    guard lhs.dimensions == rhs.dimensions else {
+        return false
+    }
+
+    if lhs.createStandardForm() == rhs.createStandardForm() {
+        return true
+    } else {
+        return false
     }
 }
 
@@ -617,5 +632,165 @@ let plane6 = Plane(x: -2.642, y: 2.875, z: -2.404, constant: -2.443)
 Plane.describe(plane5, plane6)
 
 
+class LinearSystem {
+    enum Message: String {
+        case AllPlanesMustBeInSameDimension = "All planes in the system should live in the same dimension"
+        case NoSolution = "No solutions"
+        case InfiniteSolutions = "Infinitely many solutions"
+    }
 
+    private var planes: [MultiDimensionVector]
+    private var dimensions: Int
 
+    init(planes:[MultiDimensionVector]) {
+        let planeDimensions = planes[0].dimensions
+        for mdVector in planes {
+            assert(mdVector.dimensions == planeDimensions, Message.AllPlanesMustBeInSameDimension.rawValue)
+        }
+
+        self.planes = planes
+        self.dimensions = planeDimensions
+    }
+
+    func swapRows(row1 row1: Int, row2: Int) {
+        let tempRow = planes[row2]
+        planes[row2] = planes[row1]
+        planes[row1] = tempRow
+    }
+
+    func multiplyRow(coefficient coefficient: Double, row: Int) -> Plane {
+        let normalVector = planes[row].normalVector * coefficient
+        let constant = planes[row].constantTerm * coefficient
+
+        return Plane(x: normalVector.coordinate[0], y: normalVector.coordinate[1], z: normalVector.coordinate[2], constant: constant)
+    }
+
+    func multiplyCoefficientAndRow(coefficient coefficient: Double, row: Int) {
+        planes[row] = multiplyRow(coefficient: coefficient, row: row)
+    }
+
+    func addMultipleTimesRowToRow(coefficient coefficient: Double, rowToMultiply: Int, addToRow: Int) {
+
+        let multiple = multiplyRow(coefficient: coefficient, row: rowToMultiply)
+
+        let rowToAddCoordinates = planes[addToRow].normalVector.coordinate
+        let rowToAddConstant = planes[addToRow].constantTerm
+
+        let multipliedCoordinates = multiple.normalVector.coordinate
+        let multipliedConstant = multiple.constantTerm
+
+        var newCoordinates = [Double]()
+        for (index, value) in rowToAddCoordinates.enumerate() {
+            newCoordinates.append(value + multipliedCoordinates[index])
+        }
+
+        let newConstant = rowToAddConstant + multipliedConstant
+
+        planes[addToRow] = Plane(x: newCoordinates[0], y: newCoordinates[1], z: newCoordinates[2], constant: newConstant)
+    }
+
+    func indiciesOfFirstNonzeroItemsInEachRow() -> [Int] {
+        let numberOfEquations = length()
+        var indicies = [Int]()
+        for _ in 1...numberOfEquations {
+            indicies.append(-1)
+        }
+
+        for (index, value) in planes.enumerate() {
+            assert(value.findFirstNonZeroIndex(value.normalVector) != nil, "No non-zero elements found!")
+            indicies[index] = value.findFirstNonZeroIndex(value.normalVector)!
+        }
+
+        return indicies
+    }
+
+    func length() -> Int {
+        return planes.count
+    }
+
+    func getItem(index: Int) -> MultiDimensionVector {
+        return planes[index]
+    }
+
+    func setItem(index: Int, newItem: MultiDimensionVector) {
+        assert(newItem.dimensions == dimensions, Message.AllPlanesMustBeInSameDimension.rawValue)
+        planes[index] = newItem
+    }
+
+    func describe() -> String {
+        var description = "Linear system:\n"
+        for (index, value) in planes.enumerate() {
+            description += "Equation \(index + 1): \(value.createStandardForm())\n"
+        }
+        return description
+    }
+}
+
+extension Double {
+    func isNearZero(eps: Double = 1e-10) -> Bool {
+        return abs(self) < eps
+    }
+}
+
+let p0 = Plane(x: 1, y: 1, z: 1, constant: 1)
+let p1 = Plane(x: 0, y: 1, z: 0, constant: 2)
+let p2 = Plane(x: 1, y: 1, z: -1, constant: 3)
+let p3 = Plane(x: 1, y: 0, z: -2, constant: 2)
+
+let lSystem1 = LinearSystem(planes: [p0, p1, p2, p3])
+
+lSystem1.swapRows(row1: 0, row2: 1)
+if !(lSystem1.planes[0] == p1 && lSystem1.planes[1] == p0) {
+    print("test 1 failed")
+}
+
+lSystem1.swapRows(row1: 1, row2: 3)
+lSystem1.swapRows(row1: 3, row2: 1)
+if !(lSystem1.planes[0] == p1 && lSystem1.planes[1] == p0 && lSystem1.planes[2] == p2 && lSystem1.planes[3] == p3) {
+    print("test 2 failed")
+}
+
+lSystem1.multiplyCoefficientAndRow(coefficient: 1, row: 0)
+if !(lSystem1.planes[0] == p1 && lSystem1.planes[1] == p0 && lSystem1.planes[2] == p2 && lSystem1.planes[3] == p3) {
+    print("test 4 failed")
+}
+
+lSystem1.multiplyCoefficientAndRow(coefficient: -1, row: 2)
+if !(lSystem1.planes[0] == p1 &&
+    lSystem1.planes[1] == p0 &&
+    lSystem1.planes[2] == Plane(x: -1, y: -1, z: 1, constant: -3) &&
+    lSystem1.planes[3] == p3) {
+    print("test 5 failed")
+}
+
+lSystem1.multiplyCoefficientAndRow(coefficient: 10, row: 1)
+if !(lSystem1.planes[0] == p1 &&
+    lSystem1.planes[1] == Plane(x: 10, y: 10, z: 10, constant: 10) &&
+    lSystem1.planes[2] == Plane(x: -1, y: -1, z: 1, constant: -3) &&
+    lSystem1.planes[3] == p3) {
+    print("test 6 failed")
+}
+
+lSystem1.addMultipleTimesRowToRow(coefficient: 0, rowToMultiply: 0, addToRow: 1)
+if !(lSystem1.planes[0] == p1 &&
+    lSystem1.planes[1] == Plane(x: 10, y: 10, z: 10, constant: 10) &&
+    lSystem1.planes[2] == Plane(x: -1, y: -1, z: 1, constant: -3) &&
+    lSystem1.planes[3] == p3) {
+    print("test 7 failed")
+}
+
+lSystem1.addMultipleTimesRowToRow(coefficient: 1, rowToMultiply: 0, addToRow: 1)
+if !(lSystem1.planes[0] == p1 &&
+    lSystem1.planes[1] == Plane(x: 10, y: 11, z: 10, constant: 12) &&
+    lSystem1.planes[2] == Plane(x: -1, y: -1, z: 1, constant: -3) &&
+    lSystem1.planes[3] == p3) {
+    print("test 8 failed")
+}
+
+lSystem1.addMultipleTimesRowToRow(coefficient: -1, rowToMultiply: 1, addToRow: 0)
+if !(lSystem1.planes[0] == Plane(x: -10, y: -10, z: -10, constant: -10) &&
+    lSystem1.planes[1] == Plane(x: 10, y: 11, z: 10, constant: 12) &&
+    lSystem1.planes[2] == Plane(x: -1, y: -1, z: 1, constant: -3) &&
+    lSystem1.planes[3] == p3) {
+    print("test 9 failed")
+}
