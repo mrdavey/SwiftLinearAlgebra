@@ -445,18 +445,20 @@ class MultiDimensionVector: CustomStringConvertible {
 
         if let initialIndex = self.findFirstNonZeroIndex(normalVector) {
             let coordinates = normalVector.coordinate
-            let terms: [String] = coordinates.map {
-                let isInitialElement = coordinates.indexOf($0) == initialIndex
+            let terms: [String] = coordinates.enumerate().map { (index, element) in
+                let isInitialElement = index == initialIndex
                 var output = ""
-                let roundedCoefficent = round($0 * significantDigits) / significantDigits
+                let roundedCoefficent = round(element * significantDigits) / significantDigits
                 if roundedCoefficent < 0 {
-                    output += "-"
+                    output += "- "
                 } else if roundedCoefficent > 0 && !isInitialElement {
-                    output += "+"
+                    output += "+ "
                 }
 
                 if abs(roundedCoefficent) != 0 {
                     output += "\(abs(roundedCoefficent))"
+                } else {
+                    output += "+ 0"
                 }
 
                 return output
@@ -501,15 +503,21 @@ class MultiDimensionVector: CustomStringConvertible {
         //  x = (Dk1 - Bk2) / (AD - BC)
         //  y = (-Ck1 + Ak2) / (AD - BC)
 
-        let lineOneStandardForm = self.createStandardForm().componentsSeparatedByString(" ")
+        let lineOneStandardForm: [String] = self.createStandardForm().componentsSeparatedByString(" ").flatMap() {
+            return Double($0) != nil ? $0 : nil
+        }
+
         let A = Double(lineOneStandardForm[0])!
         let B = Double(lineOneStandardForm[1])!
-        let K1 = Double(lineOneStandardForm[3])!
+        let K1 = Double(lineOneStandardForm[2])!
 
-        let lineTwoStandardForm = mdVector.createStandardForm().componentsSeparatedByString(" ")
+        let lineTwoStandardForm: [String] = mdVector.createStandardForm().componentsSeparatedByString(" ").flatMap() {
+            return Double($0) != nil ? $0 : nil
+        }
+
         let C = Double(lineTwoStandardForm[0])!
         let D = Double(lineTwoStandardForm[1])!
-        let K2 = Double(lineTwoStandardForm[3])!
+        let K2 = Double(lineTwoStandardForm[2])!
 
         let x = ((D * K1) - (B * K2)) / ((A * D) - (B * C))
         let y = ((-C * K1) + (A * K2)) / ((A * D) - (B * C))
