@@ -446,19 +446,34 @@ class MultiDimensionVector: CustomStringConvertible {
         if let initialIndex = self.findFirstNonZeroIndex(normalVector) {
             let coordinates = normalVector.coordinate
             let terms: [String] = coordinates.enumerate().map { (index, element) in
+
                 let isInitialElement = index == initialIndex
                 var output = ""
                 let roundedCoefficent = round(element * significantDigits) / significantDigits
-                if roundedCoefficent < 0 {
+                if roundedCoefficent < 0  && isInitialElement {
+                    output += "-"
+                } else if roundedCoefficent < 0 && !isInitialElement {
                     output += "- "
                 } else if roundedCoefficent > 0 && !isInitialElement {
                     output += "+ "
                 }
 
+                var variable: String
+                switch index {
+                case 0:
+                    variable = "x"
+                case 1:
+                    variable = "y"
+                case 2:
+                    variable = "z"
+                default:
+                    variable = "var"
+                }
+
                 if abs(roundedCoefficent) != 0 {
-                    output += "\(abs(roundedCoefficent))"
+                    output += "\(abs(roundedCoefficent)) \(variable)"
                 } else {
-                    output += "+ 0"
+                    output += "+ 0 \(variable)"
                 }
 
                 return output
