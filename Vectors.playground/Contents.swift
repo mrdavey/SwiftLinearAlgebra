@@ -443,6 +443,7 @@ class MultiDimensionVector: CustomStringConvertible {
 
     func createStandardForm() -> String {
 
+        normalVector
         if let initialIndex = self.findFirstNonZeroIndex(normalVector) {
             let coordinates = normalVector.coordinate
             let terms: [String] = coordinates.enumerate().map { (index, element) in
@@ -485,8 +486,9 @@ class MultiDimensionVector: CustomStringConvertible {
             return standardForm
         }
 
-        print("Couldn't createStandardForm")
-        return ""
+        print("Vector only has 0 values")
+        let roundedConstant = round(constantTerm * significantDigits) / significantDigits
+        return "0 x + 0 y + 0 z = \(roundedConstant)"
     }
 
     func isParallelTo(mdVector: MultiDimensionVector) -> (isParallel: Bool, isEqual: Bool) {
@@ -675,6 +677,11 @@ class LinearSystem {
         self.dimensions = planeDimensions
     }
 
+    init(instance: LinearSystem) {
+        planes = instance.planes
+        dimensions = instance.dimensions
+    }
+
     func swapRows(row1 row1: Int, row2: Int) {
         let tempRow = planes[row2]
         planes[row2] = planes[row1]
@@ -710,6 +717,46 @@ class LinearSystem {
         let newConstant = rowToAddConstant + multipliedConstant
 
         planes[addToRow] = Plane(x: newCoordinates[0], y: newCoordinates[1], z: newCoordinates[2], constant: newConstant)
+    }
+
+    func computeTriangularForm() -> LinearSystem {
+        let system = LinearSystem(instance: self)
+
+        let numberOfEquations = system.planes.count
+        let numberOfVariables = system.dimensions
+        var currentVariable = 0     // I.e. x, y, z
+
+        for row in 0...numberOfEquations-1 {
+
+            while currentVariable < numberOfVariables {
+
+                //  Ensure the coefficient != 0
+                var coefficient = system.planes[row].normalVector.coordinate[currentVariable]
+
+                if coefficient.isNearZero() {
+                    for increment in 0...numberOfVariables {
+                        let newRowCoefficient = system.planes[increment].normalVector.coordinate[currentVariable]
+                        if !newRowCoefficient.isNearZero() {
+                            system.swapRows(row1: row, row2: increment)
+                            break
+                        }
+                    }
+                }
+
+                //  Zero out rows below current row
+                for rowToEvaluate in row+1...numberOfEquations-1 {
+                    rowToEvaluate
+                    let nextCoefficent = system.planes[rowToEvaluate].normalVector.coordinate[currentVariable]
+                    if !nextCoefficent.isNearZero() {
+                        let elimination = -nextCoefficent/coefficient
+                        system.addMultipleTimesRowToRow(coefficient: elimination, rowToMultiply: row, addToRow: rowToEvaluate)
+                    }
+                }
+                currentVariable += 1
+            }
+        }
+
+        return system
     }
 
     func indiciesOfFirstNonzeroItemsInEachRow() -> [Int] {
@@ -754,66 +801,103 @@ extension Double {
         return abs(self) < eps
     }
 }
+//
+//let p0 = Plane(x: 1, y: 1, z: 1, constant: 1)
+//let p1 = Plane(x: 0, y: 1, z: 0, constant: 2)
+//let p2 = Plane(x: 1, y: 1, z: -1, constant: 3)
+//let p3 = Plane(x: 1, y: 0, z: -2, constant: 2)
+//
+//let lSystem1 = LinearSystem(planes: [p0, p1, p2, p3])
+//
+//lSystem1.swapRows(row1: 0, row2: 1)
+//if !(lSystem1.planes[0] == p1 && lSystem1.planes[1] == p0) {
+//    print("test 1 failed")
+//}
+//
+//lSystem1.swapRows(row1: 1, row2: 3)
+//lSystem1.swapRows(row1: 3, row2: 1)
+//if !(lSystem1.planes[0] == p1 && lSystem1.planes[1] == p0 && lSystem1.planes[2] == p2 && lSystem1.planes[3] == p3) {
+//    print("test 2 failed")
+//}
+//
+//lSystem1.multiplyCoefficientAndRow(coefficient: 1, row: 0)
+//if !(lSystem1.planes[0] == p1 && lSystem1.planes[1] == p0 && lSystem1.planes[2] == p2 && lSystem1.planes[3] == p3) {
+//    print("test 4 failed")
+//}
+//
+//lSystem1.multiplyCoefficientAndRow(coefficient: -1, row: 2)
+//if !(lSystem1.planes[0] == p1 &&
+//    lSystem1.planes[1] == p0 &&
+//    lSystem1.planes[2] == Plane(x: -1, y: -1, z: 1, constant: -3) &&
+//    lSystem1.planes[3] == p3) {
+//    print("test 5 failed")
+//}
+//
+//lSystem1.multiplyCoefficientAndRow(coefficient: 10, row: 1)
+//if !(lSystem1.planes[0] == p1 &&
+//    lSystem1.planes[1] == Plane(x: 10, y: 10, z: 10, constant: 10) &&
+//    lSystem1.planes[2] == Plane(x: -1, y: -1, z: 1, constant: -3) &&
+//    lSystem1.planes[3] == p3) {
+//    print("test 6 failed")
+//}
+//
+//lSystem1.addMultipleTimesRowToRow(coefficient: 0, rowToMultiply: 0, addToRow: 1)
+//if !(lSystem1.planes[0] == p1 &&
+//    lSystem1.planes[1] == Plane(x: 10, y: 10, z: 10, constant: 10) &&
+//    lSystem1.planes[2] == Plane(x: -1, y: -1, z: 1, constant: -3) &&
+//    lSystem1.planes[3] == p3) {
+//    print("test 7 failed")
+//}
+//
+//lSystem1.addMultipleTimesRowToRow(coefficient: 1, rowToMultiply: 0, addToRow: 1)
+//if !(lSystem1.planes[0] == p1 &&
+//    lSystem1.planes[1] == Plane(x: 10, y: 11, z: 10, constant: 12) &&
+//    lSystem1.planes[2] == Plane(x: -1, y: -1, z: 1, constant: -3) &&
+//    lSystem1.planes[3] == p3) {
+//    print("test 8 failed")
+//}
+//
+//lSystem1.addMultipleTimesRowToRow(coefficient: -1, rowToMultiply: 1, addToRow: 0)
+//if !(lSystem1.planes[0] == Plane(x: -10, y: -10, z: -10, constant: -10) &&
+//    lSystem1.planes[1] == Plane(x: 10, y: 11, z: 10, constant: 12) &&
+//    lSystem1.planes[2] == Plane(x: -1, y: -1, z: 1, constant: -3) &&
+//    lSystem1.planes[3] == p3) {
+//    print("test 9 failed")
+//}
 
-let p0 = Plane(x: 1, y: 1, z: 1, constant: 1)
-let p1 = Plane(x: 0, y: 1, z: 0, constant: 2)
-let p2 = Plane(x: 1, y: 1, z: -1, constant: 3)
-let p3 = Plane(x: 1, y: 0, z: -2, constant: 2)
+let lp1 = Plane(x: 1, y: 1, z: 1, constant: 1)
+let lp2 = Plane(x: 0, y: 1, z: 1, constant: 2)
+let ls1 = LinearSystem(planes: [lp1, lp2])
+let t1 = ls1.computeTriangularForm()
 
-let lSystem1 = LinearSystem(planes: [p0, p1, p2, p3])
-
-lSystem1.swapRows(row1: 0, row2: 1)
-if !(lSystem1.planes[0] == p1 && lSystem1.planes[1] == p0) {
-    print("test 1 failed")
+if !(t1.planes[0] == lp1 && t1.planes[1] == lp2) {
+    print("triangular test 1 failed")
 }
 
-lSystem1.swapRows(row1: 1, row2: 3)
-lSystem1.swapRows(row1: 3, row2: 1)
-if !(lSystem1.planes[0] == p1 && lSystem1.planes[1] == p0 && lSystem1.planes[2] == p2 && lSystem1.planes[3] == p3) {
-    print("test 2 failed")
+for plane in t1.planes {
+    print(plane.createStandardForm())
 }
 
-lSystem1.multiplyCoefficientAndRow(coefficient: 1, row: 0)
-if !(lSystem1.planes[0] == p1 && lSystem1.planes[1] == p0 && lSystem1.planes[2] == p2 && lSystem1.planes[3] == p3) {
-    print("test 4 failed")
+let lp3 = Plane(x: 1, y: 1, z: 1, constant: 1)
+let lp4 = Plane(x: 1, y: 1, z: 1, constant: 2)
+let ls2 = LinearSystem(planes: [lp3, lp4])
+let t2 = ls2.computeTriangularForm()
+
+if !(t2.planes[0] == lp3 && t2.planes[1] == Plane(x: 0, y: 0, z: 0, constant: 1)) {
+    print("triangular test 2 failed")
 }
 
-lSystem1.multiplyCoefficientAndRow(coefficient: -1, row: 2)
-if !(lSystem1.planes[0] == p1 &&
-    lSystem1.planes[1] == p0 &&
-    lSystem1.planes[2] == Plane(x: -1, y: -1, z: 1, constant: -3) &&
-    lSystem1.planes[3] == p3) {
-    print("test 5 failed")
+let lp5 = Plane(x: 1, y: 1, z: 1, constant: 1)
+let lp6 = Plane(x: 0, y: 1, z: 0, constant: 2)
+let lp7 = Plane(x: 1, y: 1, z: -1, constant: 3)
+let lp8 = Plane(x: 1, y: 0, z: -2, constant: 2)
+let ls3 = LinearSystem(planes: [lp5, lp6, lp7, lp8])
+let t3 = ls3.computeTriangularForm()
+
+if !(t3.planes[0] == lp5 && t3.planes[1] == lp6 && t3.planes[2] == Plane(x: 0, y: 0, z: -2, constant: 2) && t3.planes[3] == Plane(x: 1, y: 1, z: 1, constant: 1)) {
+    print("triangular test 3 failed")
+}
+for plane in t3.planes {
+    print(plane.createStandardForm())
 }
 
-lSystem1.multiplyCoefficientAndRow(coefficient: 10, row: 1)
-if !(lSystem1.planes[0] == p1 &&
-    lSystem1.planes[1] == Plane(x: 10, y: 10, z: 10, constant: 10) &&
-    lSystem1.planes[2] == Plane(x: -1, y: -1, z: 1, constant: -3) &&
-    lSystem1.planes[3] == p3) {
-    print("test 6 failed")
-}
-
-lSystem1.addMultipleTimesRowToRow(coefficient: 0, rowToMultiply: 0, addToRow: 1)
-if !(lSystem1.planes[0] == p1 &&
-    lSystem1.planes[1] == Plane(x: 10, y: 10, z: 10, constant: 10) &&
-    lSystem1.planes[2] == Plane(x: -1, y: -1, z: 1, constant: -3) &&
-    lSystem1.planes[3] == p3) {
-    print("test 7 failed")
-}
-
-lSystem1.addMultipleTimesRowToRow(coefficient: 1, rowToMultiply: 0, addToRow: 1)
-if !(lSystem1.planes[0] == p1 &&
-    lSystem1.planes[1] == Plane(x: 10, y: 11, z: 10, constant: 12) &&
-    lSystem1.planes[2] == Plane(x: -1, y: -1, z: 1, constant: -3) &&
-    lSystem1.planes[3] == p3) {
-    print("test 8 failed")
-}
-
-lSystem1.addMultipleTimesRowToRow(coefficient: -1, rowToMultiply: 1, addToRow: 0)
-if !(lSystem1.planes[0] == Plane(x: -10, y: -10, z: -10, constant: -10) &&
-    lSystem1.planes[1] == Plane(x: 10, y: 11, z: 10, constant: 12) &&
-    lSystem1.planes[2] == Plane(x: -1, y: -1, z: 1, constant: -3) &&
-    lSystem1.planes[3] == p3) {
-    print("test 9 failed")
-}
